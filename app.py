@@ -2,17 +2,19 @@ import os
 import google.generativeai as genai
 from flask import Flask, request, jsonify, render_template
 
-# --- PERUBAHAN PERTAMA: KITA IMPORT 'GoogleGenerativeAI' ---
-from langchain_google_genai import GoogleGenerativeAIEmbeddings, GoogleGenerativeAI
+# --- Import RAG (Perhatikan, importnya berkurang) ---
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_community.document_loaders import TextLoader 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.chains.combine_documents import create_stuff_documents_chain
-from langchain.prompts import ChatPromptTemplate
-from langchain.chains import create_retrieval_chain
 
 app = Flask(__name__)
-rag_chain = None
+
+# --- Variabel Global Baru ---
+# Kita tidak lagi pakai 'rag_chain'. Kita hanya butuh 'retriever' (pencari)
+# dan 'genai_model' (model AI-nya)
+retriever = None
+genai_model = None
 
 # --- Konfigurasi Model & API Key ---
 try:
@@ -22,20 +24,23 @@ try:
     
     genai.configure(api_key=api_key)
     
-    # --- PERUBAHAN KEDUA: KITA GUNAKAN 'GoogleGenerativeAI' (bukan ChatGoogleGenerativeAI) ---
-    llm = GoogleGenerativeAI(model="gemini-pro", google_api_key=api_key)
+    # --- INI PENTING ---
+    # Kita inisialisasi model 'gemini-pro' LANGSUNG dari pustaka Google
+    # BUKAN dari LangChain. Ini 100% bypass error 'v1beta'.
+    genai_model = genai.GenerativeModel('gemini-pro')
     
     # Model Embedding (TIDAK BERUBAH, INI SUDAH BENAR)
     embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004", google_api_key=api_key)
 
 except Exception as e:
     print(f"Error initializing Google GenAI models: {e}")
-    llm = None
+    genai_model = None
     embeddings = None
 
-# --- Fungsi Setup RAG (TIDAK BERUBAH) ---
+# --- Fungsi Setup RAG (DIROMBAK) ---
 def setup_rag_pipeline():
-    global rag_chain 
+    # Kita hanya mengisi 'retriever'
+    global retriever
     
     file_path = "dokumen_saya.txt" 
     
@@ -62,56 +67,76 @@ def setup_rag_pipeline():
         vectorstore = FAISS.from_documents(documents=splits, embedding=embeddings)
         print("Vector store berhasil dibuat.")
 
+        # --- INI ADALAH HASIL AKHIR KITA ---
+        # Kita simpan retriever-nya secara global
         retriever = vectorstore.as_retriever()
-
-        prompt_template = ChatPromptTemplate.from_template("""
-        Anda adalah asisten AI yang membantu menjawab pertanyaan HANYA berdasarkan konteks yang diberikan.
-        Jawab pertanyaan pengguna dengan ringkas dan jelas menggunakan bahasa Indonesia.
-        Jika informasi tidak ada di konteks, katakan "Maaf, saya tidak menemukan informasi tersebut di dalam dokumen."
-
-        Konteks:
-        {context}
-
-        Pertanyaan:
-        {input}
-
-        Jawaban:
-        """)
-
-        document_chain = create_stuff_documents_chain(llm, prompt_template)
-        rag_chain = create_retrieval_chain(retriever, document_chain)
         
-        print("RAG pipeline setup selesai dan siap digunakan.")
+        # (Kita hapus semua kode 'chain', 'prompt_template', dll. dari sini)
+        
+        print("Setup Retriever selesai dan siap digunakan.")
         return True
 
     except Exception as e:
         print(f"Error besar saat setup RAG pipeline: {e}")
         return False
 
-# --- Route Flask (TIDAK BERUBAH) ---
+# --- Route Flask ---
 @app.route('/')
 def home():
     return render_template('index.html')
 
 @app.route('/generate', methods=['POST'])
 def generate_api():
-    if not rag_chain:
-        print("Error: /generate dipanggil sebelum RAG pipeline siap.")
-        return jsonify({'error_text': "Sistem RAG (AI) belum siap. Cek log server di Koyeb."}), 503
+    # --- LOGIKA DI SINI DIROMBAK TOTAL ---
+    
+    # 1. Cek apakah retriever sudah siap (bukan rag_chain)
+    if not retriever:
+        print("Error: /generate dipanggil sebelum Retriever siap.")
+        return jsonify({'error_text': "Sistem RAG (Retriever) belum siap. Cek log server."}), 503
+
+    # 2. Cek apakah model GenAI sudah siap
+    if not genai_model:
+        print("Error: /generate dipanggil sebelum Model GenAI siap.")
+        return jsonify({'error_text': "Sistem AI (GenAI Model) belum siap. Cek log server."}), 503
 
     data = request.get_json()
     if not data or 'prompt' not in data:
         return jsonify({'error_text': 'Input "prompt" tidak ditemukan.'}), 400
 
     try:
-        prompt = data['prompt']
-        print(f"Menerima prompt: {prompt}")
+        prompt_user = data['prompt']
+        print(f"Menerima prompt: {prompt_user}")
 
-        print("Memanggil RAG chain...")
-        # Ini sekarang akan menggunakan 'GoogleGenerativeAI' class
-        response = rag_chain.invoke({"input": prompt})
-        answer = response.get('answer', 'Tidak ada jawaban dihasilkan.')
-        print(f"Jawaban RAG diterima: {answer}") 
+        # --- INI INTI DARI RAG MANUAL ---
+        
+        # A. Ambil dokumen relevan dari retriever
+        print("Mencari konteks di retriever...")
+        context_docs = retriever.invoke(prompt_user)
+        # Gabungkan semua dokumen relevan menjadi 1 teks
+        context_text = "\n\n".join([doc.page_content for doc in context_docs])
+        print("Konteks ditemukan.")
+
+        # B. Buat prompt final secara manual
+        final_prompt = f"""
+        Anda adalah asisten AI yang membantu menjawab pertanyaan HANYA berdasarkan konteks yang diberikan.
+        Jawab pertanyaan pengguna dengan ringkas dan jelas menggunakan bahasa Indonesia.
+        Jika informasi tidak ada di konteks, katakan "Maaf, saya tidak menemukan informasi tersebut di dalam dokumen."
+
+        Konteks:
+        {context_text}
+
+        Pertanyaan:
+        {prompt_user}
+
+        Jawaban:
+        """
+        
+        # C. Kirim ke Google GenAI (Bypass LangChain)
+        print("Mengirim prompt final ke Google GenAI (bukan LangChain)...")
+        response = genai_model.generate_content(final_prompt)
+        
+        answer = response.text
+        print(f"Jawaban RAG diterima: {answer}")
 
         return jsonify({'response_text': answer})
 
@@ -119,11 +144,11 @@ def generate_api():
         print(f"Error saat /generate: {e}")
         return jsonify({'error_text': str(e)}), 500
 
-# --- Bagian Startup (TIDAK BERUBAH) ---
-if not llm or not embeddings:
-    print("FATAL ERROR: Model AI atau Embeddings tidak terinisialisasi. Cek API Key.")
+# --- Bagian Startup (Sedikit diubah) ---
+if not genai_model or not embeddings:
+    print("FATAL ERROR: Model GenAI atau Embeddings tidak terinisialisasi. Cek API Key.")
 else:
-    print("Memulai setup RAG pipeline untuk Gunicorn...")
+    print("Memulai setup RAG pipeline (Retriever) untuk Gunicorn...")
     setup_rag_pipeline()
 
 if __name__ == '__main__':
