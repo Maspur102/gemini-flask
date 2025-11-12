@@ -3,6 +3,5 @@ google-generativeai
 gunicorn
 langchain
 langchain-google-genai
-langchain-community 
-pypdf
+langchain-community
 faiss-cpu
