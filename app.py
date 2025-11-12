@@ -2,7 +2,8 @@ import os
 import google.generativeai as genai
 from flask import Flask, request, jsonify, render_template
 
-from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
+# --- PERUBAHAN PERTAMA: KITA IMPORT 'GoogleGenerativeAI' ---
+from langchain_google_genai import GoogleGenerativeAIEmbeddings, GoogleGenerativeAI
 from langchain_community.vectorstores import FAISS
 from langchain_community.document_loaders import TextLoader 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -21,9 +22,8 @@ try:
     
     genai.configure(api_key=api_key)
     
-    # --- PERUBAHAN PENTING DI SINI ---
-    # Kita ganti ke model 'gemini-pro' yang paling stabil
-    llm = ChatGoogleGenerativeAI(model="gemini-pro", google_api_key=api_key)
+    # --- PERUBAHAN KEDUA: KITA GUNAKAN 'GoogleGenerativeAI' (bukan ChatGoogleGenerativeAI) ---
+    llm = GoogleGenerativeAI(model="gemini-pro", google_api_key=api_key)
     
     # Model Embedding (TIDAK BERUBAH, INI SUDAH BENAR)
     embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004", google_api_key=api_key)
@@ -108,10 +108,10 @@ def generate_api():
         print(f"Menerima prompt: {prompt}")
 
         print("Memanggil RAG chain...")
-        # Ini sekarang akan menggunakan 'gemini-pro'
+        # Ini sekarang akan menggunakan 'GoogleGenerativeAI' class
         response = rag_chain.invoke({"input": prompt})
         answer = response.get('answer', 'Tidak ada jawaban dihasilkan.')
-        print(f"Jawaban RAG diterima: {answer}") # Saya tambahkan log jawaban
+        print(f"Jawaban RAG diterima: {answer}") 
 
         return jsonify({'response_text': answer})
 
