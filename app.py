@@ -21,11 +21,11 @@ try:
     
     genai.configure(api_key=api_key)
     
-    # Model untuk Chat (TIDAK BERUBAH)
-    llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=api_key)
-    
     # --- PERUBAHAN PENTING DI SINI ---
-    # Kita ganti model embedding ke versi yang lebih baru dan standar
+    # Kita ganti nama model chat ke versi 'latest' yang lebih stabil
+    llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-latest", google_api_key=api_key)
+    
+    # Model Embedding (TIDAK BERUBAH, INI SUDAH BENAR)
     embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004", google_api_key=api_key)
 
 except Exception as e:
@@ -59,11 +59,10 @@ def setup_rag_pipeline():
         print(f"Dokumen dipecah menjadi {len(splits)} potongan (chunks).")
 
         print("Membuat vector store FAISS...")
-        # Ini akan otomatis menggunakan 'embeddings' yang baru
         vectorstore = FAISS.from_documents(documents=splits, embedding=embeddings)
         print("Vector store berhasil dibuat.")
 
-        retriever = vectorstore.as_retriever() # <- Saya perbaiki typo di sini dari 'retrisver'
+        retriever = vectorstore.as_retriever()
 
         prompt_template = ChatPromptTemplate.from_template("""
         Anda adalah asisten AI yang membantu menjawab pertanyaan HANYA berdasarkan konteks yang diberikan.
