@@ -1,7 +1,6 @@
 import os
 import google.generativeai as genai
-# --- PERUBAHAN DI SINI ---
-# Kita ganti render_template_string menjadi render_template
+# --- INI YANG BENAR: Menggunakan render_template ---
 from flask import Flask, request, jsonify, render_template
 
 # --- Import RAG (LangChain) ---
@@ -87,18 +86,15 @@ def setup_rag_pipeline():
         print(f"Error besar saat setup RAG pipeline: {e}")
         return False
 
-# --- KODE HTML TEMPLATE SUDAH DIHAPUS DARI SINI ---
-
 # --- Route Flask ---
 
 @app.route('/')
 def home():
-    # --- PERUBAHAN BESAR DI SINI ---
-    # Kita tidak lagi pakai render_template_string
-    # Kita panggil file 'index.html' dari folder 'templates'
+    # --- INI BAGIAN YANG PENTING ---
+    # Memanggil file 'index.html' dari folder 'templates'
     return render_template('index.html')
 
-# --- Route API (TIDAK BERUBAH SAMA SEKALI) ---
+# --- Route API (TIDAK BERUBAH) ---
 @app.route('/generate', methods=['POST'])
 def generate_api():
     if not rag_chain:
