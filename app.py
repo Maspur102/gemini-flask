@@ -2,10 +2,8 @@ import os
 import google.generativeai as genai
 from flask import Flask, request, jsonify, render_template
 
-# --- Import RAG (LangChain) ---
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 from langchain_community.vectorstores import FAISS
-# --- PERUBAHAN DI SINI: Kita ganti PyPDFLoader menjadi TextLoader ---
 from langchain_community.document_loaders import TextLoader 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.chains.combine_documents import create_stuff_documents_chain
@@ -15,26 +13,30 @@ from langchain.chains import create_retrieval_chain
 app = Flask(__name__)
 rag_chain = None
 
-# --- Konfigurasi Model & API Key (TIDAK BERUBAH) ---
+# --- Konfigurasi Model & API Key ---
 try:
     api_key = os.environ.get('GOOGLE_API_KEY') 
     if not api_key:
         raise ValueError("GOOGLE_API_KEY environment variable not set. Cek di Koyeb.")
     
     genai.configure(api_key=api_key)
+    
+    # Model untuk Chat (TIDAK BERUBAH)
     llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=api_key)
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=api_key)
+    
+    # --- PERUBAHAN PENTING DI SINI ---
+    # Kita ganti model embedding ke versi yang lebih baru dan standar
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004", google_api_key=api_key)
 
 except Exception as e:
     print(f"Error initializing Google GenAI models: {e}")
     llm = None
     embeddings = None
 
-# --- Fungsi Setup RAG (Ada Perubahan) ---
+# --- Fungsi Setup RAG (TIDAK BERUBAH) ---
 def setup_rag_pipeline():
     global rag_chain 
     
-    # --- PERUBAHAN DI SINI: Kita cari file .txt ---
     file_path = "dokumen_saya.txt" 
     
     if not os.path.exists(file_path):
@@ -44,15 +46,12 @@ def setup_rag_pipeline():
     try:
         print(f"Memulai RAG pipeline setup untuk: {file_path}...")
         
-        # --- PERUBAHAN DI SINI: Kita gunakan TextLoader ---
-        # Kita tambahkan encoding='utf-8' untuk memastikan teks Indonesia terbaca
         loader = TextLoader(file_path, encoding='utf-8') 
         docs = loader.load()
         
         if not docs:
             print("Error: Dokumen teks tidak bisa dimuat atau kosong.")
             return False
-        # (Logika di bawah ini tidak berubah)
         print(f"Dokumen dimuat, {len(docs)} bagian.")
 
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
@@ -60,10 +59,11 @@ def setup_rag_pipeline():
         print(f"Dokumen dipecah menjadi {len(splits)} potongan (chunks).")
 
         print("Membuat vector store FAISS...")
+        # Ini akan otomatis menggunakan 'embeddings' yang baru
         vectorstore = FAISS.from_documents(documents=splits, embedding=embeddings)
         print("Vector store berhasil dibuat.")
 
-        retriever = vectorstore.as_retrisver()
+        retriever = vectorstore.as_retriever() # <- Saya perbaiki typo di sini dari 'retrisver'
 
         prompt_template = ChatPromptTemplate.from_template("""
         Anda adalah asisten AI yang membantu menjawab pertanyaan HANYA berdasarkan konteks yang diberikan.
@@ -90,7 +90,6 @@ def setup_rag_pipeline():
         return False
 
 # --- Route Flask (TIDAK BERUBAH) ---
-
 @app.route('/')
 def home():
     return render_template('index.html')
