@@ -27,7 +27,7 @@ try:
     # --- INI PENTING ---
     # Kita inisialisasi model 'gemini-pro' LANGSUNG dari pustaka Google
     # BUKAN dari LangChain. Ini 100% bypass error 'v1beta'.
-    genai_model = genai.GenerativeModel('gemini-pro')
+    genai_model = genai.GenerativeModel('gemini-1.0-pro')
     
     # Model Embedding (TIDAK BERUBAH, INI SUDAH BENAR)
     embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004", google_api_key=api_key)
