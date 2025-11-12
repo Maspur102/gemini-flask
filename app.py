@@ -22,8 +22,8 @@ try:
     genai.configure(api_key=api_key)
     
     # --- PERUBAHAN PENTING DI SINI ---
-    # Kita ganti nama model chat ke versi 'latest' yang lebih stabil
-    llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-latest", google_api_key=api_key)
+    # Kita ganti ke model 'gemini-pro' yang paling stabil
+    llm = ChatGoogleGenerativeAI(model="gemini-pro", google_api_key=api_key)
     
     # Model Embedding (TIDAK BERUBAH, INI SUDAH BENAR)
     embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004", google_api_key=api_key)
@@ -108,9 +108,10 @@ def generate_api():
         print(f"Menerima prompt: {prompt}")
 
         print("Memanggil RAG chain...")
+        # Ini sekarang akan menggunakan 'gemini-pro'
         response = rag_chain.invoke({"input": prompt})
         answer = response.get('answer', 'Tidak ada jawaban dihasilkan.')
-        print("Jawaban RAG diterima.")
+        print(f"Jawaban RAG diterima: {answer}") # Saya tambahkan log jawaban
 
         return jsonify({'response_text': answer})
 
