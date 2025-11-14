@@ -14,29 +14,38 @@ MODEL_NAME = "abhinema/gpt"
 def run_bytez_model():
     """
     Mengakses API Bytez, menjalankan model AI, dan merender hasilnya ke HTML.
+    Menangani potensi 'too many values to unpack'.
     """
-    output_text = "Sedang menjalankan model AI..."
+    output_text = "Gagal memproses permintaan."
     error_message = None
     
     try:
-        # 1. Inisialisasi SDK Bytez
         sdk = Bytez(KEY)
-        
-        # 2. Memilih model
         model = sdk.model(MODEL_NAME)
         
-        # 3. Mengirim input ke model
-        output, error = model.run(INPUT_PROMPT)
+        # --- PERBAIKAN UTAMA DI SINI ---
+        # Menggunakan *response untuk menangkap semua nilai yang dikembalikan
+        response = model.run(INPUT_PROMPT)
         
-        if output:
-            output_text = output
-        elif error:
-            error_message = f"Error dari Bytez: {error}"
-            output_text = "Gagal mendapatkan hasil dari model."
+        if len(response) == 2:
+            # Format lama/standar: (output, error)
+            output, error = response
+            
+            if output:
+                output_text = output
+            elif error:
+                error_message = f"Error dari Bytez: {error}"
+                output_text = "Gagal mendapatkan hasil dari model."
+        elif len(response) > 2:
+            # Menangani jika Bytez mengembalikan lebih dari 2 nilai
+            error_message = f"Bytez mengembalikan {len(response)} nilai, bukan 2. Mungkin API telah berubah."
+        else:
+            # Menangani jika Bytez mengembalikan 0 atau 1 nilai
+            error_message = f"Bytez mengembalikan {len(response)} nilai, bukan 2."
 
     except Exception as e:
+        # Menangani exception umum, termasuk network error atau Bytez error lainnya
         error_message = f"Terjadi kesalahan saat memproses: {e}"
-        output_text = "Gagal memproses permintaan."
 
     # Mengirim data ke template index.html
     return render_template(
@@ -48,5 +57,4 @@ def run_bytez_model():
     )
 
 if __name__ == '__main__':
-    # Pastikan 'debug=True' dihapus saat deploy ke production
     app.run(debug=True)
